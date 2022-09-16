@@ -1,5 +1,5 @@
-name: 'Should I notify slack?'
-description: 'Decide if a notification to slack is necessary taking into account the previous build result.'
+name: 'Should I notify?'
+description: 'Decide if a notification is necessary taking into account the previous build result.'
 branding:
   icon: 'bell'
   color: 'green'
@@ -53,18 +53,16 @@ runs:
         fi
         echo "status of the current build: $current_status"
         echo "::set-output name=current_status::$current_status"
-        if [[ "${{ inputs.notify_on_changed_status }}" ]]; then
+        if [[ $current_status == failure ]]; then
+          echo "::set-output name=should_send_message::yes"
+        elif [[ "${{ inputs.notify_on_changed_status }}" ]]; then
             if [[ $current_status == $last_status ]]; then
               echo "::set-output name=should_send_message::no"
             else
               echo "::set-output name=should_send_message::yes"
             fi
+        elif [[ $last_status == failure ]]; then
+          echo "::set-output name=should_send_message::yes"
         else
-          if [[ $current_status == failure ]]; then
-            echo "::set-output name=should_send_message::yes"
-          elif [[ $last_status == failure ]]; then
-            echo "::set-output name=should_send_message::yes"
-          else
-            echo "::set-output name=should_send_message::no"
-          fi
+          echo "::set-output name=should_send_message::no"
         fi
