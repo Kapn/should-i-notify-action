@@ -47,22 +47,24 @@ runs:
         echo "::set-output name=last_status::$last_status"
         needs_context="${{ inputs.needs_context }}"
         if [[ $(echo $needs_context | grep "result: failure") ]]; then
-            current_status=failure
+            current_status="failure"
         else
-            current_status=success
+            current_status="success"
         fi
         echo "status of the current build: $current_status"
         echo "::set-output name=current_status::$current_status"
-        if [[ $current_status == failure ]]; then
+        echo "do we notify on changed status: ${{ inputs.notify_on_changed_status }}"
+        if [[ $current_status == "failure" ]]; then
           echo "::set-output name=should_send_message::yes"
-        elif [[ "${{ inputs.notify_on_changed_status }}" ]]; then
+        elif [[ -z "${{ inputs.notify_on_changed_status }}" ]]; then
             if [[ $current_status == $last_status ]]; then
               echo "::set-output name=should_send_message::no"
             else
               echo "::set-output name=should_send_message::yes"
             fi
-        elif [[ $last_status == failure ]]; then
+        elif [[ $last_status == "failure" ]]; then
           echo "::set-output name=should_send_message::yes"
         else
           echo "::set-output name=should_send_message::no"
         fi
+        echo "should send message: $should_send_message"
