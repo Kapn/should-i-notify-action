@@ -55,16 +55,20 @@ runs:
         echo "::set-output name=current_status::$current_status"
         echo "do we notify on changed status: ${{ inputs.notify_on_changed_status }}"
         if [[ $current_status == "failure" ]]; then
+          echo "current build failed. should_send_message? yes"
           echo "::set-output name=should_send_message::yes"
         elif [[ -z "${{ inputs.notify_on_changed_status }}" ]]; then
             if [[ $current_status == $last_status ]]; then
+              echo "current build has same result as previous. should_send_message? no"
               echo "::set-output name=should_send_message::no"
             else
+              echo "current build has different result than the previous. should_send_message? yes"
               echo "::set-output name=should_send_message::yes"
             fi
         elif [[ $last_status == "failure" ]]; then
+          echo "previous build failed. should_send_message? yes"
           echo "::set-output name=should_send_message::yes"
         else
+          echo "previous build did not fail. should_send_message? no"
           echo "::set-output name=should_send_message::no"
-        fi
-        echo "should send message: $should_send_message"
+        fi        
