@@ -70,12 +70,13 @@ slack-workflow-status:
   runs-on: ubuntu-latest
   steps:
     - name: Determine if we need to notify
-      uses: Jimdo/should-i-notify-action@main
+      uses: Kapn/should-i-notify-action@main
       id: should_notify
       with:
         branch: main
         needs_context: ${{ toJson(needs) }}
         github_token: ${{ secrets.GITHUB_TOKEN }}
+        notify_on_changed_status: 'oh yeah'
 
     - name: Slack workflow notification
       if: steps.should_notify.outputs.should_send_message == 'yes'
