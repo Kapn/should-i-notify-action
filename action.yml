@@ -24,37 +24,54 @@ outputs:
     value: ${{ steps.determine-notification.outputs.should_send_message }}
   last_status:
     description: "status of the previously completed workflow (or null)"
-    value: ${{ steps.determine-notification.outputs.last_status }}
+    value: ${{ steps.determine-last-status.outputs.last_status }}
   current_status:
     description: "status of the current workflow"
     value: ${{ steps.determine-notification.outputs.current_status }}
 runs:
   using: "composite"
   steps:
+    - name: Determine workflow_id
+      id: determine-workflow-id
+      shell: bash
+      run: |
+        echo "::set-output name=workflow_id::$(curl --header 'authorization: Bearer ${{ inputs.github_token }}' \
+            --header 'content-type: application/json' \
+            https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }} | jq -r .workflow_id)"
+
+    - name: Determine last_status
+      id: determine-last-status
+      shell: bash
+      run: |
+        echo "::set-output name=last_status::$(curl --silent --header 'authorization: Bearer ${{ inputs.github_token }}' \
+                      --header 'content-type: application/json' \
+                      "https://api.github.com/repos/${{ github.repository }}/actions/workflows/${{ steps.determine-workflow-id.outputs.workflow_id }}/runs?per_page=1&status=completed&branch=${{ inputs.branch }}" | \
+                      jq -r '[.workflow_runs[] | select(.conclusion != "skipped")][0].conclusion')"
+
+    - name: Determine current_status
+      id: determine-current-status
+      shell: bash
+      run: |
+        needs_context="${{ inputs.needs_context }}"
+        if [[ $(echo $needs_context | grep "result: failure") ]]; then
+          echo "::set-output name=current_status::failure"
+        else
+          echo "::set-output name=current_status::success"
+        fi
+
     - name: Determine if we need to notify
       id: determine-notification
       shell: bash
       run: |
-        workflow_id=$(curl --header 'authorization: Bearer ${{ inputs.github_token }}' \
-            --header 'content-type: application/json' \
-            https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }} | jq -r .workflow_id)
+        workflow_id=${{ steps.determine-workflow-id.outputs.workflow_id }}
+        last_status=${{ steps.determine-last-status.outputs.last_status }}
+        current_status=${{ steps.determine-current-status.outputs.current_status }}
+
         echo "workflow id: $workflow_id"
-        last_status=$(curl --silent --header 'authorization: Bearer ${{ inputs.github_token }}' \
-                      --header 'content-type: application/json' \
-                      "https://api.github.com/repos/${{ github.repository }}/actions/workflows/$workflow_id/runs?per_page=10&status=completed&branch=${{ inputs.branch }}" | \
-                      jq -r '[.workflow_runs[] | select(.conclusion != "skipped")][0].conclusion')
-        echo "status of the previous build: $last_status"
-        echo "::set-output name=last_status::$last_status"
-        needs_context="${{ inputs.needs_context }}"
-        if [[ $(echo $needs_context | grep "result: failure") ]]; then
-            current_status="failure"
-        else
-            current_status="success"
-        fi
+        echo "status of the last build: $last_status"
         echo "status of the current build: $current_status"
-        echo "::set-output name=current_status::$current_status"
-        echo "do we notify on changed status: ${{ inputs.notify_on_changed_status }}"
-        if [[ $current_status == "failure" ]]; then
+
+        if [[ $current_status == failure ]]; then
           echo "current build failed. should_send_message? yes"
           echo "::set-output name=should_send_message::yes"
         elif [[ -z "${{ inputs.notify_on_changed_status }}" ]]; then
@@ -71,4 +88,4 @@ runs:
         else
           echo "previous build did not fail. should_send_message? no"
           echo "::set-output name=should_send_message::no"
-        fi        
+        fi
